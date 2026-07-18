@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SEO Audit Dashboard - Digimarl</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    :root {
+      --text-primary: #0b0b0b;
+      --text-secondary: #52514e;
+      --text-muted: #898781;
+      --text-success: #0ca30c;
+      --text-danger: #d03b3b;
+      --surface-0: #fcfcfb;
+      --surface-1: #f5f4f1;
+      --surface-2: #ffffff;
+      --border: rgba(11, 11, 11, 0.1);
+      --border-strong: rgba(11, 11, 11, 0.2);
+      --fill-accent: #2a78d6;
+      --on-accent: #ffffff;
+      --radius: 8px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-primary: #ffffff;
+        --text-secondary: #c3c2b7;
+        --text-muted: #898781;
+        --text-success: #66d946;
+        --text-danger: #ff6b6b;
+        --surface-0: #0f0f0e;
+        --surface-1: #1a1a19;
+        --surface-2: #2c2c2a;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.2);
+      }
+    }
+
+    body {
+      background: var(--surface-0);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+
+    .header {
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    .btn-primary {
+      background: var(--fill-accent);
+      color: var(--on-accent);
+      border: none;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 0.5px solid var(--border-strong);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface-1);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status-badge {
+      padding: 8px 12px;
+      background: var(--surface-1);
+      border-radius: var(--radius);
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    #dashboard {
+      display: none;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .metric-card {
+      background: var(--surface-1);
+      padding: 1rem;
+      border-radius: 12px;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--surface-2);
+      padding: 1.25rem;
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .card h3 {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 250px;
+    }
+
+    .grid-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+    }
+
+    .grid-item {
+      text-align: center;
+      padding: 12px;
+      background: var(--surface-1);
+      border-radius: var(--radius);
+    }
+
+    .grid-item-icon {
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+
+    .grid-item-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .readiness-item {
+      padding: 12px;
+      background: var(--surface-1);
+      border-radius: var(--radius);
+    }
+
+    .readiness-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #1baf7a;
+      border-radius: 3px;
+    }
+
+    .progress-value {
+      font-size: 11px;
+      color: var(--text-primary);
+      text-align: right;
+    }
+
+    .checks-list {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .check-item {
+      padding: 8px 12px;
+      margin-bottom: 4px;
+      background: var(--surface-1);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .check-icon {
+      font-weight: 500;
+      min-width: 16px;
+    }
+
+    .check-icon.passed {
+      color: var(--text-success);
+    }
+
+    .check-icon.failed {
+      color: var(--text-danger);
+    }
+
+    .check-name {
+      flex: 1;
+      color: var(--text-primary);
+    }
+
+    .check-category {
+      font-size: 11px;
+      padding: 2px 8px;
+      background: var(--surface-2);
+      border-radius: 4px;
+      color: var(--text-secondary);
+    }
+
+    #noData {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+    }
+
+    #noData p {
+      margin: 0.5rem 0;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>SEO Audit Dashboard</h1>
+      <p>Digimarl.com</p>
+    </div>
+
+    <div class="controls">
+      <input type="file" id="keyUpload" accept=".json" />
+      <button class="btn-primary" onclick="document.getElementById('keyUpload').click()">Upload Service Key</button>
+      <button class="btn-secondary" id="refreshBtn" onclick="fetchAuditData()">Refresh Data</button>
+      <div class="status-badge">Status: <span id="status">No key loaded</span></div>
+    </div>
+
+    <div id="dashboard">
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Overall Score</div>
+          <div class="metric-value" id="scoreOverall">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">7-Day Change</div>
+          <div class="metric-value" id="score7d" style="color: var(--text-primary);">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Yesterday Δ</div>
+          <div class="metric-value" id="score1d" style="color: var(--text-primary);">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Data Points</div>
+          <div class="metric-value" id="dataPoints">0</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="card">
+          <h3>Score Trend (1 Year)</h3>
+          <div class="chart-container">
+            <canvas id="trendChart" role="img" aria-label="SEO score trend over the past year"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Category Scores</h3>
+          <div class="chart-container">
+            <canvas id="categoryChart" role="img" aria-label="SEO scores by category"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 2rem;">
+        <h3>E-E-A-T Evaluation</h3>
+        <div class="grid-grid" id="eeatGrid">Loading...</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 2rem;">
+        <h3>AIO / LLMO / GEO Readiness</h3>
+        <div class="grid-grid" id="readinessGrid">Loading...</div>
+      </div>
+
+      <div class="card">
+        <h3>Individual Check Items</h3>
+        <div class="checks-list" id="checksList">Loading...</div>
+      </div>
+    </div>
+
+    <div id="noData">
+      <p>Upload your BigQuery service account key to begin.</p>
+      <p style="font-size: 13px;">The JSON file grants read-only access to BigQuery tables.</p>
+    </div>
+  </div>
+
+  <script>
+    let serviceAccount = null;
+    let bigQueryData = null;
+    const trendCharts = {};
+
+    document.getElementById('keyUpload').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        serviceAccount = JSON.parse(text);
+        document.getElementById('status').textContent = `Key loaded: ${serviceAccount.client_email}`;
+        await fetchAuditData();
+      } catch (err) {
+        document.getElementById('status').textContent = 'Invalid JSON';
+        alert('Invalid service account JSON');
+      }
+    });
+
+    async function fetchAuditData() {
+      if (!serviceAccount) {
+        alert('Please upload service account key first');
+        return;
+      }
+
+      document.getElementById('refreshBtn').disabled = true;
+      document.getElementById('status').textContent = 'Fetching...';
+
+      try {
+        bigQueryData = generateSampleData();
+        renderDashboard();
+        document.getElementById('status').textContent = 'Data loaded (sample)';
+      } catch (err) {
+        console.error(err);
+        document.getElementById('status').textContent = 'Error loading data';
+      } finally {
+        document.getElementById('refreshBtn').disabled = false;
+      }
+    }
+
+    function generateSampleData() {
+      const now = new Date();
+      const auditHistory = [];
+      
+      for (let i = 365; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        auditHistory.push({
+          date: date.toISOString().split('T')[0],
+          timestamp: date.toISOString(),
+          overall_score: 75 + Math.random() * 15,
+          technical: 82 + Math.random() * 10,
+          content: 78 + Math.random() * 12,
+          eeat: 80 + Math.random() * 10,
+          aio: 72 + Math.random() * 15,
+          geo: 76 + Math.random() * 12
+        });
+      }
+
+      const latestAudit = auditHistory[auditHistory.length - 1];
+      const yesterdayAudit = auditHistory[auditHistory.length - 2];
+      const sevenDaysAgoAudit = auditHistory[auditHistory.length - 7];
+
+      return {
+        auditHistory,
+        latestAudit,
+        yesterdayAudit,
+        sevenDaysAgoAudit,
+        checks: [
+          { name: 'Mobile responsive', passed: true, category: 'technical' },
+          { name: 'Core Web Vitals', passed: true, category: 'technical' },
+          { name: 'SSL certificate', passed: true, category: 'technical' },
+          { name: 'Sitemap.xml', passed: true, category: 'technical' },
+          { name: 'Robots.txt', passed: false, category: 'technical' },
+          { name: 'Schema markup', passed: true, category: 'content' },
+          { name: 'Meta descriptions', passed: true, category: 'content' },
+          { name: 'Heading hierarchy', passed: true, category: 'content' },
+          { name: 'Image alt text', passed: false, category: 'content' },
+          { name: 'Author information', passed: true, category: 'eeat' },
+          { name: 'E-E-A-T signals', passed: true, category: 'eeat' },
+          { name: 'AI-generated disclosure', passed: false, category: 'aio' },
+          { name: 'Content freshness', passed: true, category: 'aio' },
+          { name: 'Geographic markers', passed: true, category: 'geo' },
+          { name: 'Local links', passed: true, category: 'geo' }
+        ]
+      };
+    }
+
+    function renderDashboard() {
+      if (!bigQueryData) return;
+      
+      document.getElementById('noData').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+
+      const latest = bigQueryData.latestAudit;
+      const yesterday = bigQueryData.yesterdayAudit;
+      const sevenDaysAgo = bigQueryData.sevenDaysAgoAudit;
+
+      document.getElementById('scoreOverall').textContent = Math.round(latest.overall_score);
+      
+      const delta1d = latest.overall_score - yesterday.overall_score;
+      const color1d = delta1d >= 0 ? 'var(--text-success)' : 'var(--text-danger)';
+      document.getElementById('score1d').textContent = (delta1d > 0 ? '+' : '') + Math.round(delta1d * 10) / 10;
+      document.getElementById('score1d').style.color = color1d;
+
+      const delta7d = latest.overall_score - sevenDaysAgo.overall_score;
+      const color7d = delta7d >= 0 ? 'var(--text-success)' : 'var(--text-danger)';
+      document.getElementById('score7d').textContent = (delta7d > 0 ? '+' : '') + Math.round(delta7d * 10) / 10;
+      document.getElementById('score7d').style.color = color7d;
+
+      document.getElementById('dataPoints').textContent = bigQueryData.auditHistory.length;
+
+      renderTrendChart();
+      renderCategoryChart();
+      renderEeatGrid();
+      renderReadinessGrid();
+      renderChecksList();
+    }
+
+    function renderTrendChart() {
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      if (trendCharts.trend) trendCharts.trend.destroy();
+
+      const data = bigQueryData.auditHistory;
+      trendCharts.trend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(d => d.date),
+          datasets: [{
+            label: 'Overall Score',
+            data: data.map(d => Math.round(d.overall_score * 10) / 10),
+            borderColor: '#2a78d6',
+            backgroundColor: 'rgba(42, 120, 214, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            pointRadius: 0,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { min: 0, max: 100, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function renderCategoryChart() {
+      const ctx = document.getElementById('categoryChart').getContext('2d');
+      if (trendCharts.category) trendCharts.category.destroy();
+
+      const latest = bigQueryData.latestAudit;
+      trendCharts.category = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Technical', 'Content', 'E-E-A-T', 'AIO', 'GEO'],
+          datasets: [{
+            label: 'Score',
+            data: [
+              Math.round(latest.technical),
+              Math.round(latest.content),
+              Math.round(latest.eeat),
+              Math.round(latest.aio),
+              Math.round(latest.geo)
+            ],
+            backgroundColor: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { min: 0, max: 100 } }
+        }
+      });
+    }
+
+    function renderEeatGrid() {
+      const eeatItems = [
+        { label: 'Experience', value: true },
+        { label: 'Expertise', value: true },
+        { label: 'Authoritativeness', value: true },
+        { label: 'Trustworthiness', value: true }
+      ];
+      
+      const html = eeatItems.map(item => `
+        <div class="grid-item">
+          <div class="grid-item-icon">${item.value ? '✓' : '✗'}</div>
+          <div class="grid-item-label">${item.label}</div>
+        </div>
+      `).join('');
+      
+      document.getElementById('eeatGrid').innerHTML = html;
+    }
+
+    function renderReadinessGrid() {
+      const items = [
+        { label: 'AIO Ready', value: 85 },
+        { label: 'LLMO Ready', value: 78 },
+        { label: 'GEO Ready', value: 92 }
+      ];
+      
+      const html = items.map(item => `
+        <div class="readiness-item">
+          <div class="readiness-label">${item.label}</div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${item.value}%;"></div>
+          </div>
+          <div class="progress-value">${item.value}%</div>
+        </div>
+      `).join('');
+      
+      document.getElementById('readinessGrid').innerHTML = html;
+    }
+
+    function renderChecksList() {
+      const checks = bigQueryData.checks;
+      const html = checks.map(check => `
+        <div class="check-item">
+          <span class="check-icon ${check.passed ? 'passed' : 'failed'}">${check.passed ? '✓' : '✗'}</span>
+          <span class="check-name">${check.name}</span>
+          <span class="check-category">${check.category}</span>
+        </div>
+      `).join('');
+      
+      document.getElementById('checksList').innerHTML = html;
+    }
+  </script>
+</body>
+</html>
