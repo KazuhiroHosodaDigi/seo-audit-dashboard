@@ -6,7 +6,6 @@ const { BigQuery } = require('@google-cloud/bigquery');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Search Console データが入っているプロジェクト
 const bigquery = new BigQuery({ projectId: 'ga4-connect-409204' });
 
 app.use(cors());
@@ -25,16 +24,26 @@ app.get('/api/daily-summary', async (req, res) => {
         SUM(clicks) AS clicks,
         SUM(impressions) AS impressions,
         SAFE_DIVIDE(SUM(clicks), SUM(impressions)) AS ctr,
-        SAFE_DIVIDE(SUM(sum_top_position), SUM(impressions)) + 1 AS avg_position
+        SAFE_DIVIDE(SUM(sum_top_position), SUM(impressions)) AS avg_position
       FROM \`ga4-connect-409204.searchconsole.searchdata_site_impression\`
       WHERE data_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY)
-      GROUP BY date
-      ORDER BY date ASC
+      GROUP BY data_date
+      ORDER BY data_date ASC
     `;
-    const [rows] = await bigquery.query({ query });
-    res.json(rows);
+    const options = { useLegacySql: false };
+    const [rows] = await bigquery.query({ query, ...options });
+    
+    const formatted = rows.map(row => ({
+      date: row.date.value || row.date,
+      clicks: row.clicks || 0,
+      impressions: row.impressions || 0,
+      ctr: row.ctr || 0,
+      avg_position: (row.avg_position || 0) + 1
+    }));
+    
+    res.json(formatted);
   } catch (err) {
-    console.error(err);
+    console.error('daily-summary error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -48,18 +57,28 @@ app.get('/api/top-queries', async (req, res) => {
         SUM(clicks) AS clicks,
         SUM(impressions) AS impressions,
         SAFE_DIVIDE(SUM(clicks), SUM(impressions)) AS ctr,
-        SAFE_DIVIDE(SUM(sum_top_position), SUM(impressions)) + 1 AS avg_position
+        SAFE_DIVIDE(SUM(sum_top_position), SUM(impressions)) AS avg_position
       FROM \`ga4-connect-409204.searchconsole.searchdata_site_impression\`
       WHERE data_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 28 DAY)
         AND query IS NOT NULL
       GROUP BY query
       ORDER BY clicks DESC
-      LIMIT 30
     `;
-    const [rows] = await bigquery.query({ query });
-    res.json(rows);
+    
+    const options = { useLegacySql: false, maxResults: 30 };
+    const [rows] = await bigquery.query({ query, ...options });
+    
+    const formatted = rows.map(row => ({
+      query: row.query || '(not set)',
+      clicks: row.clicks || 0,
+      impressions: row.impressions || 0,
+      ctr: row.ctr || 0,
+      avg_position: (row.avg_position || 0) + 1
+    }));
+    
+    res.json(formatted);
   } catch (err) {
-    console.error(err);
+    console.error('top-queries error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -77,10 +96,19 @@ app.get('/api/device-breakdown', async (req, res) => {
       GROUP BY device
       ORDER BY clicks DESC
     `;
-    const [rows] = await bigquery.query({ query });
-    res.json(rows);
+    
+    const options = { useLegacySql: false };
+    const [rows] = await bigquery.query({ query, ...options });
+    
+    const formatted = rows.map(row => ({
+      device: row.device || 'unknown',
+      clicks: row.clicks || 0,
+      impressions: row.impressions || 0
+    }));
+    
+    res.json(formatted);
   } catch (err) {
-    console.error(err);
+    console.error('device-breakdown error:', err);
     res.status(500).json({ error: err.message });
   }
 });
