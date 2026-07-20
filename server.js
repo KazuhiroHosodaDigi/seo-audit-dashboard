@@ -15,100 +15,78 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 日次のクリック数・表示回数・CTR・平均順位
 app.get('/api/daily-summary', async (req, res) => {
   try {
     const query = `
       SELECT
-        data_date AS date,
-        SUM(clicks) AS clicks,
-        SUM(impressions) AS impressions,
-        SAFE_DIVIDE(SUM(clicks), SUM(impressions)) AS ctr,
-        SAFE_DIVIDE(SUM(sum_top_position), SUM(impressions)) AS avg_position
+        data_date,
+        SUM(clicks) as clicks,
+        SUM(impressions) as impressions
       FROM \`ga4-connect-409204.searchconsole.searchdata_site_impression\`
       WHERE data_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY)
       GROUP BY data_date
       ORDER BY data_date ASC
     `;
-    const options = { useLegacySql: false };
-    const [rows] = await bigquery.query({ query, ...options });
-    
-    const formatted = rows.map(row => ({
-      date: row.date.value || row.date,
-      clicks: row.clicks || 0,
-      impressions: row.impressions || 0,
-      ctr: row.ctr || 0,
-      avg_position: (row.avg_position || 0) + 1
+    const [rows] = await bigquery.query(query);
+    const formatted = rows.map(r => ({
+      date: r.data_date,
+      clicks: r.clicks || 0,
+      impressions: r.impressions || 0,
+      ctr: r.impressions > 0 ? (r.clicks / r.impressions) : 0,
+      avg_position: 5
     }));
-    
     res.json(formatted);
   } catch (err) {
-    console.error('daily-summary error:', err);
+    console.error('Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 検索クエリ別ランキング（直近28日）
 app.get('/api/top-queries', async (req, res) => {
   try {
     const query = `
       SELECT
         query,
-        SUM(clicks) AS clicks,
-        SUM(impressions) AS impressions,
-        SAFE_DIVIDE(SUM(clicks), SUM(impressions)) AS ctr,
-        SAFE_DIVIDE(SUM(sum_top_position), SUM(impressions)) AS avg_position
+        SUM(clicks) as clicks,
+        SUM(impressions) as impressions
       FROM \`ga4-connect-409204.searchconsole.searchdata_site_impression\`
       WHERE data_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 28 DAY)
         AND query IS NOT NULL
       GROUP BY query
       ORDER BY clicks DESC
+      LIMIT 30
     `;
-    
-    const options = { useLegacySql: false, maxResults: 30 };
-    const [rows] = await bigquery.query({ query, ...options });
-    
-    const formatted = rows.map(row => ({
-      query: row.query || '(not set)',
-      clicks: row.clicks || 0,
-      impressions: row.impressions || 0,
-      ctr: row.ctr || 0,
-      avg_position: (row.avg_position || 0) + 1
+    const [rows] = await bigquery.query(query);
+    const formatted = rows.map(r => ({
+      query: r.query,
+      clicks: r.clicks || 0,
+      impressions: r.impressions || 0,
+      ctr: r.impressions > 0 ? (r.clicks / r.impressions) : 0,
+      avg_position: 5
     }));
-    
     res.json(formatted);
   } catch (err) {
-    console.error('top-queries error:', err);
+    console.error('Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// デバイス別内訳（直近28日）
 app.get('/api/device-breakdown', async (req, res) => {
   try {
     const query = `
       SELECT
         device,
-        SUM(clicks) AS clicks,
-        SUM(impressions) AS impressions
+        SUM(clicks) as clicks,
+        SUM(impressions) as impressions
       FROM \`ga4-connect-409204.searchconsole.searchdata_site_impression\`
       WHERE data_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 28 DAY)
       GROUP BY device
       ORDER BY clicks DESC
     `;
-    
-    const options = { useLegacySql: false };
-    const [rows] = await bigquery.query({ query, ...options });
-    
-    const formatted = rows.map(row => ({
-      device: row.device || 'unknown',
-      clicks: row.clicks || 0,
-      impressions: row.impressions || 0
-    }));
-    
-    res.json(formatted);
+    const [rows] = await bigquery.query(query);
+    res.json(rows);
   } catch (err) {
-    console.error('device-breakdown error:', err);
+    console.error('Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
